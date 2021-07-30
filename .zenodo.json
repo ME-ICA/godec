@@ -1,0 +1,23 @@
+{
+    "creators": [
+        {
+            "name": "The ME-ICA Community"
+        },
+        {
+            "name": "Salo, Taylor",
+            "affiliation": "Florida International University",
+            "orcid": "0000-0001-9813-3167"
+        },
+        {
+            "name": "Kundu, Prantik",
+            "affiliation": "Mount Sinai Hospital",
+            "orcid": "0000-0001-9367-3068"
+        }
+    ],
+    "keywords": [
+        "neuroimaging",
+        "fMRI"
+    ],
+    "license": "LGPL-2.1",
+    "upload_type": "software"
+}

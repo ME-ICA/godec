@@ -54,7 +54,7 @@ REQUIRES = [
     "nilearn",
     "numpy>=1.15",
     "scipy>=1.3.3",
-    "pywt>=1.1.1",
+    "pywavelets>=1.1.1",
 ]
 
 TESTS_REQUIRES = [
@@ -79,7 +79,7 @@ EXTRA_REQUIRES = {
 
 ENTRY_POINTS = {"console_scripts": [
     "godec=godec.workflows.godec:_main",
-]},
+]}
 
 # Enable a handle to install all extra dependencies at once
 EXTRA_REQUIRES["all"] = list(set([v for deps in EXTRA_REQUIRES.values() for v in deps]))

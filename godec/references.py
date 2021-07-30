@@ -1,7 +1,7 @@
 """References used throughout the package."""
-from .due import due
+from .due import BibTeX
 
-GODEC = due.BibTeX(
+GODEC = BibTeX(
     """
     @InProceedings{ICML2011Zhou_41,
         author =    {Tianyi Zhou and Dacheng Tao},
