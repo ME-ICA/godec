@@ -1,9 +1,4 @@
-# -*- coding: utf-8 -*-
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
-# vi: set ft=python sts=4 ts=4 sw=4 et:
-"""
-Base module variables
-"""
+"""Base module variables."""
 import importlib.util
 import json
 import os.path as op
@@ -95,7 +90,7 @@ PYTHON_REQUIRES = ">=3.5"
 
 # Package classifiers
 CLASSIFIERS = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",

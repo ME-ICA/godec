@@ -1,4 +1,4 @@
-"""Run GODEC."""
+"""Core GODEC functions."""
 import json
 import os
 
@@ -8,9 +8,15 @@ from nilearn.masking import apply_mask, unmask
 from scipy.linalg import qr
 from scipy.sparse.linalg import svds
 
+from . import references
+from .due import due
 from .utils import dwtmat, idwtmat, wthresh
 
 
+@due.dcite(
+    references.GODEC,
+    description="Introduces the standard GODEC algorithm.",
+)
 def standard_godec(
     X,
     thresh=0.03,
@@ -21,7 +27,7 @@ def standard_godec(
     random_seed=0,
     verbose=True,
 ):
-    """Run GODEC.
+    """Run the standard GODEC method.
 
     Default threshold of .03 is assumed to be for input in the range 0-1...
     original matlab had 8 out of 255, which is about .03 scaled to 0-1 range
@@ -65,6 +71,10 @@ def standard_godec(
     return L, S, G
 
 
+@due.dcite(
+    references.GODEC,
+    description="Introduces the semi-soft GODEC algorithm.",
+)
 def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
     """Run the Greedy Semi-Soft GoDec Algorithm (GreBsmo).
 
@@ -292,7 +302,7 @@ def run_godec_denoising(
     inpower=2,
     wavelet=False,
 ):
-    """Run GODEC denoising.
+    """Run GODEC denoising in neuroimaging data.
 
     Notes
     -----
