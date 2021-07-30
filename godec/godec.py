@@ -1,9 +1,9 @@
 """Core GODEC functions."""
 import json
+import logging
 import os
 
 import numpy as np
-from nilearn._utils.niimg import load_niimg
 from nilearn.masking import apply_mask, unmask
 from scipy.linalg import qr
 from scipy.sparse.linalg import svds
@@ -11,6 +11,8 @@ from scipy.sparse.linalg import svds
 from . import references
 from .due import due
 from .utils import dwtmat, idwtmat, wthresh
+
+LGR = logging.getLogger(__name__)
 
 
 @due.dcite(
@@ -25,14 +27,13 @@ def standard_godec(
     tol=1e-3,
     max_iter=100,
     random_seed=0,
-    verbose=True,
 ):
     """Run the standard GODEC method.
 
     Default threshold of .03 is assumed to be for input in the range 0-1...
     original matlab had 8 out of 255, which is about .03 scaled to 0-1 range
     """
-    print("++Starting Go Decomposition")
+    LGR.info("++Starting Go Decomposition")
     m, n = X.shape
     if m < n:
         X = X.T
@@ -65,8 +66,7 @@ def standard_godec(
         S = S.T
         G = G.T
 
-    if verbose:
-        print(f"Finished at iteration {itr}")
+    LGR.debug(f"Finished at iteration {itr}")
 
     return L, S, G
 
@@ -131,7 +131,7 @@ def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
     # ok
     error = np.zeros(max(rankk * inpower, 1) + 1)
     # ok
-    print(error)
+    # LGR.info(error)
     X, s, Y = svds(D, k, which="LM")
     # CHECK svds
     s = np.diag(s)
@@ -171,7 +171,7 @@ def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
             iii = iii + inpower
 
         for i_iter in range(inpower + 1):
-            print(f"r {r}, i_iter {i_iter}, rrank {rrank}, alf {alf}")
+            LGR.debug(f"r {r}, i_iter {i_iter}, rrank {rrank}, alf {alf}")
 
             # Update of X
             X = L.dot(Y.T)
@@ -211,7 +211,7 @@ def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
             if estrank == 1:
                 dR = abs(np.diag(R))
                 drops = dR[:-1] / dR[1:]
-                # print(dR.shape)
+                # LGR.info(dR.shape)
                 dmx = max(drops)
                 imx = np.argmax(drops)
                 rel_drp = (rankmax - 1) * dmx / (sum(drops) - dmx)
@@ -233,7 +233,7 @@ def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
             ratio = error[ii] / error[ii - 1]
             if np.isinf(ratio):
                 ratio = 0
-            # print(ii, error, ratio)
+            # LGR.info(ii, error, ratio)
 
             if ratio >= 1.1:
                 increment = max(0.1 * alf, 0.1 * increment)
@@ -249,7 +249,7 @@ def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
                 alf = alf + increment
 
             # Update of L
-            # print("updating L")
+            # LGR.info("updating L")
             X1 = X
             Y1 = Y
             L1 = L
@@ -315,20 +315,14 @@ def run_godec_denoising(
     if not prefix.endswith("_"):
         prefix = prefix + "_"
 
-    img = load_niimg(in_file)
-    mask = load_niimg(mask)
-
-    if thresh is None:
-        masked_data = apply_mask(img, mask).T
-        mu = masked_data.mean(axis=-1)
-        thresh = np.median(mu[mu != 0]) * 0.01
-
-    nx, ny, nz, nt = img.shape
-    masked_data = apply_mask(img, mask)
-    _, n_voxels = masked_data.shape
+    masked_data = apply_mask(in_file, mask)
 
     # Transpose to match ME-ICA convention (SxT instead of TxS)
     masked_data = masked_data.T
+
+    if thresh is None:
+        mu = masked_data.mean(axis=-1)
+        thresh = np.median(mu[mu != 0]) * 0.01
 
     if norm_mode == "dm":
         # Demean
@@ -344,10 +338,10 @@ def run_godec_denoising(
     # GoDec
     godec_outputs = {}
     if wavelet:
-        print("++Wavelet transforming data")
+        LGR.info("++Wavelet transforming data")
         temp_data, cal = dwtmat(dnorm)
         thresh_ = temp_data.std() * thresh
-        print(f"Setting threshold to {thresh_}")
+        LGR.info(f"Setting threshold to {thresh_}")
     else:
         temp_data = dnorm.copy()
         thresh_ = thresh
@@ -372,13 +366,12 @@ def run_godec_denoising(
                 tol=1e-3,
                 max_iter=500,
                 random_seed=0,
-                verbose=True,
             )
 
             godec_outputs[rank] = [X_L, X_S, X_G]
 
     if wavelet:
-        print("++Inverse wavelet transforming outputs")
+        LGR.info("++Inverse wavelet transforming outputs")
         for rank in godec_outputs.keys():
             godec_outputs[rank] = [idwtmat(arr, cal) for arr in godec_outputs[rank]]
 
@@ -387,9 +380,9 @@ def run_godec_denoising(
             godec_outputs[rank][0] = godec_outputs[rank][0] + rmu[:, np.newaxis]
     elif norm_mode == "vn":
         for rank in godec_outputs.keys():
-            godec_outputs[rank][0] = (
-                godec_outputs[rank][0] * rstd[:, np.newaxis]
-            ) + rmu[:, np.newaxis]
+            godec_outputs[rank][0] = (godec_outputs[rank][0] * rstd[:, np.newaxis]) + rmu[
+                :, np.newaxis
+            ]
             godec_outputs[rank][1] = godec_outputs[rank][1] * rstd[:, np.newaxis]
             godec_outputs[rank][2] = godec_outputs[rank][2] * rstd[:, np.newaxis]
 
@@ -409,6 +402,7 @@ def run_godec_denoising(
         metadata_file = os.path.join(out_dir, "dataset_description.json")
         with open(metadata_file, "w") as fo:
             json.dump(metadata, fo, sort_keys=True, indent=4)
+
         lowrank_img.to_filename(
             os.path.join(out_dir, f"{prefix}desc-GODEC_rank-{rank}_lowrankts.nii.gz")
         )
