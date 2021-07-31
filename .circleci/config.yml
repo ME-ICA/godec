@@ -28,38 +28,6 @@ jobs:
           paths:
               - /opt/conda/envs/godec_py37
 
-  unittest_35:
-    docker:
-      - image: continuumio/miniconda3
-    working_directory: /tmp/src/godec
-    steps:
-      - checkout
-      - restore_cache:
-          key: conda-py35-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
-      - run:
-          name: Generate environment
-          command: |
-            if [ ! -d /opt/conda/envs/godec_py35 ]; then
-              conda create -yq -n godec_py35 python=3.5
-              source activate godec_py35
-              pip install .[tests]
-            fi
-      - run:
-          name: Running unit tests
-          command: |
-            source activate godec_py35
-            py.test --ignore godec/tests/test_integration.py --cov-append --cov-report term-missing --cov=godec godec/
-            mkdir /tmp/src/coverage
-            mv /tmp/src/godec/.coverage /tmp/src/coverage/.coverage.py35
-      - save_cache:
-          key: conda-py35-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
-          paths:
-              - /opt/conda/envs/godec_py35
-      - persist_to_workspace:
-          root: /tmp
-          paths:
-              - src/coverage/.coverage.py35
-
   unittest_36:
     docker:
       - image: continuumio/miniconda3
@@ -185,7 +153,6 @@ workflows:
   version: 2.1
   build_test:
     jobs:
-      - unittest_35
       - unittest_36
       - makeenv_37
       - unittest_37:
@@ -197,7 +164,6 @@ workflows:
             - makeenv_37
       - merge_coverage:
           requires:
-            - unittest_35
             - unittest_36
             - unittest_37
             - unittest_38
