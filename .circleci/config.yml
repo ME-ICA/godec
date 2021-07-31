@@ -1,0 +1,208 @@
+# Python CircleCI 2.1 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-python/ for more details
+#
+version: 2.1
+orbs:
+  codecov: codecov/codecov@1.0.5
+jobs:
+
+  makeenv_37:
+    docker:
+      - image: continuumio/miniconda3
+    working_directory: /tmp/src/godec
+    steps:
+      - checkout
+      - restore_cache:
+          key: conda-py37-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+      - run:
+          name: Generate environment
+          command: |
+            if [ ! -d /opt/conda/envs/godec_py37 ]; then
+              conda create -yq -n godec_py37 python=3.7
+              source activate godec_py37
+              pip install .[tests]
+            fi
+      - save_cache:
+          key: conda-py37-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+          paths:
+              - /opt/conda/envs/godec_py37
+
+  unittest_35:
+    docker:
+      - image: continuumio/miniconda3
+    working_directory: /tmp/src/godec
+    steps:
+      - checkout
+      - restore_cache:
+          key: conda-py35-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+      - run:
+          name: Generate environment
+          command: |
+            apt-get install -yqq make
+            if [ ! -d /opt/conda/envs/godec_py35 ]; then
+              conda create -yq -n godec_py35 python=3.5
+              source activate godec_py35
+              pip install .[tests]
+            fi
+      - run:
+          name: Running unit tests
+          command: |
+            source activate godec_py35
+            py.test --ignore godec/tests/test_integration.py --cov-append --cov-report term-missing --cov=godec godec/
+            mkdir /tmp/src/coverage
+            mv /tmp/src/godec/.coverage /tmp/src/coverage/.coverage.py35
+      - save_cache:
+          key: conda-py35-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+          paths:
+              - /opt/conda/envs/godec_py35
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+              - src/coverage/.coverage.py35
+
+  unittest_36:
+    docker:
+      - image: continuumio/miniconda3
+    working_directory: /tmp/src/godec
+    steps:
+      - checkout
+      - restore_cache:
+          key: conda-py36-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+      - run:
+          name: Generate environment
+          command: |
+            apt-get install -yqq make
+            if [ ! -d /opt/conda/envs/godec_py36 ]; then
+              conda create -yq -n godec_py36 python=3.6
+              source activate godec_py36
+              pip install .[tests]
+            fi
+      - run:
+          name: Running unit tests
+          command: |
+            source activate godec_py36
+            py.test --ignore godec/tests/test_integration.py --cov-append --cov-report term-missing --cov=godec godec/
+            mkdir /tmp/src/coverage
+            mv /tmp/src/godec/.coverage /tmp/src/coverage/.coverage.py36
+      - save_cache:
+          key: conda-py36-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+          paths:
+              - /opt/conda/envs/godec_py36
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+              - src/coverage/.coverage.py36
+
+  unittest_37:
+    docker:
+      - image: continuumio/miniconda3
+    working_directory: /tmp/src/godec
+    steps:
+      - checkout
+      - restore_cache:
+          key: conda-py37-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+      - run:
+          name: Running unit tests
+          command: |
+            apt-get install -y make
+            source activate godec_py37  # depends on makeenv_37
+            py.test --ignore godec/tests/test_integration.py --cov-append --cov-report term-missing --cov=godec godec/
+            mkdir /tmp/src/coverage
+            mv /tmp/src/godec/.coverage /tmp/src/coverage/.coverage.py37
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+              - src/coverage/.coverage.py37
+
+  unittest_38:
+    docker:
+      - image: continuumio/miniconda3
+    working_directory: /tmp/src/godec
+    steps:
+      - checkout
+      - restore_cache:
+          key: conda-py38-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+      - run:
+          name: Generate environment
+          command: |
+            apt-get install -yqq make
+            if [ ! -d /opt/conda/envs/godec_py38 ]; then
+              conda create -yq -n godec_py38 python=3.8
+              source activate godec_py38
+              pip install .[tests]
+            fi
+      - run:
+          name: Running unit tests
+          command: |
+            source activate godec_py38
+            py.test --ignore godec/tests/test_integration.py --cov-append --cov-report term-missing --cov=godec godec/
+            mkdir /tmp/src/coverage
+            mv /tmp/src/godec/.coverage /tmp/src/coverage/.coverage.py38
+      - save_cache:
+          key: conda-py38-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+          paths:
+              - /opt/conda/envs/godec_py38
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+              - src/coverage/.coverage.py38
+
+  style_check:
+    docker:
+      - image: continuumio/miniconda3
+    working_directory: /tmp/src/godec
+    steps:
+      - checkout
+      - restore_cache:
+          key: conda-py37-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+      - run:
+          name: Style check
+          command: |
+            apt-get install -yqq make
+            source activate godec_py37  # depends on makeenv37
+            flake8 godec
+
+  merge_coverage:
+    working_directory: /tmp/src/godec
+    docker:
+      - image: continuumio/miniconda3
+    steps:
+      - attach_workspace:
+          at: /tmp
+      - checkout
+      - restore_cache:
+          key: conda-py37-v1-{{ checksum "godec/info.py" }}-{{ checksum "setup.py" }}
+      - run:
+          name: Merge coverage files
+          command: |
+            apt-get install -yqq curl
+            source activate godec_py37  # depends on makeenv37
+            cd /tmp/src/coverage/
+            coverage combine
+            coverage xml
+      - store_artifacts:
+          path: /tmp/src/coverage
+      - codecov/upload:
+          file: /tmp/src/coverage/coverage.xml
+
+workflows:
+  version: 2.1
+  build_test:
+    jobs:
+      - unittest_35
+      - unittest_36
+      - makeenv_37
+      - unittest_37:
+          requires:
+            - makeenv_37
+      - unittest_38
+      - style_check:
+          requires:
+            - makeenv_37
+      - merge_coverage:
+          requires:
+            - unittest_35
+            - unittest_36
+            - unittest_37
+            - unittest_38
