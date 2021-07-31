@@ -39,7 +39,6 @@ jobs:
       - run:
           name: Generate environment
           command: |
-            apt-get install -yqq make
             if [ ! -d /opt/conda/envs/godec_py35 ]; then
               conda create -yq -n godec_py35 python=3.5
               source activate godec_py35
@@ -72,7 +71,6 @@ jobs:
       - run:
           name: Generate environment
           command: |
-            apt-get install -yqq make
             if [ ! -d /opt/conda/envs/godec_py36 ]; then
               conda create -yq -n godec_py36 python=3.6
               source activate godec_py36
@@ -105,7 +103,6 @@ jobs:
       - run:
           name: Running unit tests
           command: |
-            apt-get install -y make
             source activate godec_py37  # depends on makeenv_37
             py.test --ignore godec/tests/test_integration.py --cov-append --cov-report term-missing --cov=godec godec/
             mkdir /tmp/src/coverage
@@ -126,7 +123,6 @@ jobs:
       - run:
           name: Generate environment
           command: |
-            apt-get install -yqq make
             if [ ! -d /opt/conda/envs/godec_py38 ]; then
               conda create -yq -n godec_py38 python=3.8
               source activate godec_py38
@@ -159,7 +155,6 @@ jobs:
       - run:
           name: Style check
           command: |
-            apt-get install -yqq make
             source activate godec_py37  # depends on makeenv37
             flake8 godec
 
