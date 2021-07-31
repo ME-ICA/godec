@@ -386,22 +386,22 @@ def run_godec_denoising(
             godec_outputs[rank][1] = godec_outputs[rank][1] * rstd[:, np.newaxis]
             godec_outputs[rank][2] = godec_outputs[rank][2] * rstd[:, np.newaxis]
 
+    metadata = {
+        "normalization": norm_mode,
+        "wavelet": wavelet,
+        "ranks": ranks,
+        "k": drank,
+        "p": inpower,
+        "t": thresh,
+    }
+    metadata_file = os.path.join(out_dir, "dataset_description.json")
+    with open(metadata_file, "w") as fo:
+        json.dump(metadata, fo, sort_keys=True, indent=4)
+
     for rank, outputs in godec_outputs.items():
         lowrank_img = unmask(outputs[0].T, mask)
         sparse_img = unmask(outputs[1].T, mask)
         noise_img = unmask(outputs[2].T, mask)
-
-        metadata = {
-            "normalization": norm_mode,
-            "wavelet": wavelet,
-            "rank": rank,
-            "k": drank,
-            "p": inpower,
-            "t": thresh,
-        }
-        metadata_file = os.path.join(out_dir, "dataset_description.json")
-        with open(metadata_file, "w") as fo:
-            json.dump(metadata, fo, sort_keys=True, indent=4)
 
         lowrank_img.to_filename(
             os.path.join(out_dir, f"{prefix}desc-GODEC_rank-{rank}_lowrankts.nii.gz")
