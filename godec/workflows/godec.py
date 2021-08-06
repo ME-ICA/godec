@@ -61,7 +61,7 @@ def _get_parser():
     parser.add_argument(
         "-k",
         "--increment",
-        dest="drank",
+        dest="rank_step_size",
         type=int,
         help="Rank search step size",
         default=2,
@@ -69,7 +69,7 @@ def _get_parser():
     parser.add_argument(
         "-p",
         "--power",
-        dest="inpower",
+        dest="iterated_power",
         type=int,
         help="Power for power method",
         default=2,
@@ -81,14 +81,6 @@ def _get_parser():
         help="Wavelet transform before GODEC",
         default=False,
         action="store_true",
-    )
-    parser.add_argument(
-        "-t",
-        "--thresh",
-        dest="thresh",
-        type=float,
-        help="Threshold of some kind.",
-        default=0.03,
     )
     parser.add_argument(
         "-n",

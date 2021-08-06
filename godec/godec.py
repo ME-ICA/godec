@@ -171,7 +171,15 @@ def standard_godec(
     references.BILATERAL_SKETCH,
     description="Introduces the greedy bilateral smoothing method.",
 )
-def greedy_semisoft_godec(D, rank, tau=1, tol=1e-7, iterated_power=2, rank_step_size=2, quiet=False):
+def greedy_semisoft_godec(
+    D,
+    rank,
+    tau=1,
+    tol=1e-7,
+    iterated_power=2,
+    rank_step_size=2,
+    quiet=False,
+):
     """Run the Greedy Semi-Soft GoDec Algorithm (GreBsmo).
 
     Parameters
@@ -400,7 +408,7 @@ def run_godec_denoising(
     method="greedy",
     ranks=[4],
     norm_mode="vn",
-    drank=2,
+    rank_step_size=2,
     iterated_power=2,
     wavelet=False,
 ):
@@ -450,18 +458,17 @@ def run_godec_denoising(
                 tau=1,
                 tol=1e-7,
                 iterated_power=iterated_power,
-                rank_step_size=drank,
+                rank_step_size=rank_step_size,
             )
         else:
-            for rank in ranks:
-                lowrank, sparse, reconstruction, noise, error = standard_godec(
-                    temp_data,
-                    rank=rank,
-                    card=None,
-                    iterated_power=iterated_power,
-                    tol=0.001,
-                    max_iter=500,
-                )
+            lowrank, sparse, reconstruction, noise, error = standard_godec(
+                temp_data,
+                rank=rank,
+                card=None,
+                iterated_power=iterated_power,
+                tol=0.001,
+                max_iter=500,
+            )
 
         godec_outputs[rank] = {
             "lowrank": lowrank,
@@ -472,8 +479,9 @@ def run_godec_denoising(
 
     if wavelet:
         LGR.info("++Inverse wavelet transforming outputs")
-        for rank in godec_outputs.keys():
-            godec_outputs[rank] = [idwtmat(arr, cal) for arr in godec_outputs[rank]]
+        for rank, arrs in godec_outputs.items():
+            for name, arr in arrs.items():
+                godec_outputs[rank][name] = idwtmat(arr, cal)
 
     if norm_mode == "dm":
         for rank in godec_outputs.keys():
@@ -499,7 +507,7 @@ def run_godec_denoising(
         "normalization": norm_mode,
         "wavelet": wavelet,
         "ranks": ranks,
-        "rank_step_size": drank,
+        "rank_step_size": rank_step_size,
         "iterated_power": iterated_power,
     }
     metadata_file = os.path.join(out_dir, "dataset_description.json")
@@ -507,10 +515,10 @@ def run_godec_denoising(
         json.dump(metadata, fo, sort_keys=True, indent=4)
 
     for rank, outputs in godec_outputs.items():
-        lowrank_img = unmask(outputs[0].T, mask)
-        sparse_img = unmask(outputs[1].T, mask)
-        reconstruction_img = unmask(outputs[2].T, mask)
-        noise_img = unmask(outputs[3].T, mask)
+        lowrank_img = unmask(outputs["lowrank"].T, mask)
+        sparse_img = unmask(outputs["sparse"].T, mask)
+        reconstruction_img = unmask(outputs["reconstruction"].T, mask)
+        noise_img = unmask(outputs["noise"].T, mask)
 
         lowrank_img.to_filename(
             os.path.join(out_dir, f"{prefix}desc-GODEC_rank-{rank}_lowrankts.nii.gz")

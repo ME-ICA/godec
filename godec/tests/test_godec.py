@@ -15,9 +15,8 @@ def test_run_godec_denoising_smoke(testdata, tmp_path_factory):
         method="greedy",
         ranks=[2, 4, 6],
         norm_mode="vn",
-        thresh=0.03,
-        drank=2,
-        inpower=2,
+        iterated_power=2,
+        rank_step_size=2,
         wavelet=False,
     )
     out_files = [
@@ -25,12 +24,15 @@ def test_run_godec_denoising_smoke(testdata, tmp_path_factory):
         "TEST_desc-GODEC_rank-2_bold.nii.gz",
         "TEST_desc-GODEC_rank-2_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-2_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-2_bold.nii.gz",
         "TEST_desc-GODEC_rank-4_bold.nii.gz",
         "TEST_desc-GODEC_rank-4_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-4_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-4_bold.nii.gz",
         "TEST_desc-GODEC_rank-6_bold.nii.gz",
         "TEST_desc-GODEC_rank-6_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-6_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-6_bold.nii.gz",
     ]
     for out_file in out_files:
         assert os.path.isfile(os.path.join(tmpdir, out_file))
@@ -47,9 +49,8 @@ def test_run_godec_denoising_smoke_wavelet(testdata, tmp_path_factory):
         method="greedy",
         ranks=[2, 4, 6],
         norm_mode="vn",
-        thresh=0.03,
-        drank=2,
-        inpower=2,
+        iterated_power=2,
+        rank_step_size=2,
         wavelet=True,
     )
     out_files = [
@@ -57,12 +58,15 @@ def test_run_godec_denoising_smoke_wavelet(testdata, tmp_path_factory):
         "TEST_desc-GODEC_rank-2_bold.nii.gz",
         "TEST_desc-GODEC_rank-2_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-2_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-2_bold.nii.gz",
         "TEST_desc-GODEC_rank-4_bold.nii.gz",
         "TEST_desc-GODEC_rank-4_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-4_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-4_bold.nii.gz",
         "TEST_desc-GODEC_rank-6_bold.nii.gz",
         "TEST_desc-GODEC_rank-6_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-6_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-6_bold.nii.gz",
     ]
     for out_file in out_files:
         assert os.path.isfile(os.path.join(tmpdir, out_file))
@@ -70,29 +74,27 @@ def test_run_godec_denoising_smoke_wavelet(testdata, tmp_path_factory):
 
 def test_greedy_semisoft_godec_smoke(testdata):
     """Smoke test godec.greedy_semisoft_godec."""
-    ranks = [2, 4, 6]
     out = godec.greedy_semisoft_godec(
         testdata["data_array"],
-        ranks=ranks,
+        rank=2,
         tau=1,
         tol=1e-7,
-        inpower=2,
-        k=2,
+        iterated_power=2,
+        rank_step_size=1,
     )
-    assert set(out.keys()) == set(ranks)
-    assert all(len(vals) == 3 for vals in out.values())
+    assert len(out) == 5
+    assert all(val.shape == testdata["data_array"].shape for val in out[:-1])
 
 
 def test_standard_godec_smoke(testdata):
     """Smoke test godec.standard_godec."""
     out = godec.standard_godec(
         testdata["data_array"],
-        thresh=0.03,
         rank=2,
-        power=1,
-        tol=1e-3,
+        card=None,
+        iterated_power=1,
         max_iter=100,
-        random_seed=0,
+        tol=1e-3,
     )
-    assert len(out) == 3
-    assert all(val.shape == testdata["data_array"].shape for val in out)
+    assert len(out) == 5
+    assert all(val.shape == testdata["data_array"].shape for val in out[:-1])

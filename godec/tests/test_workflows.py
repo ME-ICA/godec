@@ -32,12 +32,15 @@ def test_run_godec_denoising_standard_dm_cli_smoke(testdata, tmp_path_factory):
         "TEST_desc-GODEC_rank-2_bold.nii.gz",
         "TEST_desc-GODEC_rank-2_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-2_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-2_bold.nii.gz",
         "TEST_desc-GODEC_rank-4_bold.nii.gz",
         "TEST_desc-GODEC_rank-4_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-4_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-4_bold.nii.gz",
         "TEST_desc-GODEC_rank-6_bold.nii.gz",
         "TEST_desc-GODEC_rank-6_lowrankts.nii.gz",
         "TEST_desc-GODEC_rank-6_errorts.nii.gz",
+        "TEST_desc-GODECReconstructed_rank-6_bold.nii.gz",
     ]
     for out_file in out_files:
         assert os.path.isfile(os.path.join(tmpdir, out_file))
