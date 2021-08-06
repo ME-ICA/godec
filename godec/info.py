@@ -41,9 +41,7 @@ EMAIL = "tsalo006@fiu.edu"
 STATUS = "Prototype"
 URL = "https://github.com/me-ica/godec"
 PACKAGENAME = "godec"
-DESCRIPTION = (
-    "A Python implementation of the Go Decomposition algorithm, adapted for fMRI data."
-)
+DESCRIPTION = "A Python implementation of the Go Decomposition algorithm, adapted for fMRI data."
 LONGDESC = longdesc
 
 DOWNLOAD_URL = "https://github.com/ME-ICA/{name}/archive/{ver}.tar.gz".format(
@@ -79,9 +77,11 @@ EXTRA_REQUIRES = {
     "duecredit": ["duecredit"],
 }
 
-ENTRY_POINTS = {"console_scripts": [
-    "godec=godec.workflows.godec:_main",
-]}
+ENTRY_POINTS = {
+    "console_scripts": [
+        "godec=godec.workflows.godec:_main",
+    ]
+}
 
 # Enable a handle to install all extra dependencies at once
 EXTRA_REQUIRES["all"] = list(set([v for deps in EXTRA_REQUIRES.values() for v in deps]))
