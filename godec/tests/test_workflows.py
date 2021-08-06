@@ -1,3 +1,4 @@
+"""Tests for the godec.workflows module."""
 import os
 
 from godec.workflows import godec as godec_workflow
