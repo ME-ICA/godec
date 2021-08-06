@@ -27,6 +27,7 @@ def standard_godec(
     iterated_power=1,
     max_iter=100,
     tol=0.001,
+    quiet=False,
 ):
     """Run the standard GODEC method.
 
@@ -47,7 +48,7 @@ def standard_godec(
         in which case it will be set to the number of elements in X.
         Default is None.
     iterated_power : :obj:`int`, optional
-        Number of iterations for the power method, increasing it lead to better accuracy and more
+        Number of iterations for the power method, increasing it leads to better accuracy and more
         time cost. Must be an integer >= 1. The default is 1.
     max_iter : :obj:`int`, optional
         Maximum number of iterations to be run. Must be an integer >= 1. The default is 100.
@@ -62,7 +63,9 @@ def standard_godec(
         The sparse matrix. Known as S in the original code and formulae.
     reconstruction : :obj:`numpy.ndarray` of shape (n_samples, n_features)
         The reconstruction matrix. Known as LS in the original code and formulae.
-    rmse : :obj:`list`
+    noise : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The noise matrix. Known as G in the original code and formulae.
+    rmse : :obj:`numpy.ndarray` of shape (n_iterations,)
         Root mean-squared error values. One value for each iteration.
 
     Notes
@@ -96,7 +99,6 @@ def standard_godec(
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
     """
-    i_iter = 1
     rmse = []
     card = np.prod(X.shape) if card is None else card
 
@@ -111,11 +113,11 @@ def standard_godec(
     LGR.info("++Starting Go Decomposition")
 
     # Initialization of L and S
-    low_rank = X
+    low_rank = X.copy()
     sparse = np.zeros(X.shape)
     reconstruction = np.zeros(X.shape)
 
-    while True:
+    for i_iter in range(max_iter):
         # Update of L
         Y2 = np.random.randn(n_features, rank)
         for j_power in range(iterated_power):
@@ -141,20 +143,24 @@ def standard_godec(
         error = np.sqrt(metrics.mean_squared_error(X, reconstruction))
         rmse.append(error)
 
-        LGR.info(f"iter: {i_iter}\terror: {error}")
-        if (error <= tol) or (i_iter >= max_iter):
+        if not quiet:
+            print(f"Iteration: {i_iter}, RMSE: {error}")
+
+        if error <= tol:
             break
-        else:
-            i_iter = i_iter + 1
 
     LGR.debug(f"Finished at iteration {i_iter}")
 
+    noise = X - reconstruction
     if data_transposed:
         low_rank = low_rank.T
         sparse = sparse.T
         reconstruction = reconstruction.T
+        noise = noise.T
 
-    return low_rank, sparse, reconstruction, rmse
+    rmse = np.array(rmse)
+
+    return low_rank, sparse, reconstruction, noise, rmse
 
 
 @due.dcite(
@@ -165,7 +171,7 @@ def standard_godec(
     references.BILATERAL_SKETCH,
     description="Introduces the greedy bilateral smoothing method.",
 )
-def greedy_semisoft_godec(D, ranks, tau=1, tol=1e-7, inpower=2, k=2):
+def greedy_semisoft_godec(D, rank, tau=1, tol=1e-7, iterated_power=2, rank_step_size=2, quiet=False):
     """Run the Greedy Semi-Soft GoDec Algorithm (GreBsmo).
 
     Parameters
@@ -176,25 +182,27 @@ def greedy_semisoft_godec(D, ranks, tau=1, tol=1e-7, inpower=2, k=2):
         rank(L)<=rank
     tau : float
         soft thresholding
-    inpower : float
+    iterated_power : float
         >=0, power scheme modification, increasing it lead to better accuracy and more time cost
-    k : int
-        rank stepsize
+    rank_step_size : int
+        rank stepsize. Was k.
 
     Returns
     -------
-    L
-        Low-rank part
-    S
-        Sparse part
-    RMSE
-        error
-    error
+    low_rank : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The low-rank matrix. Known as L in the original code and formulae.
+    sparse : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The sparse matrix. Known as S in the original code and formulae.
+    reconstruction : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The reconstruction matrix. Known as LS in the original code and formulae.
+    noise : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The noise matrix. Known as G in the original code and formulae.
+    error : :obj:`numpy.ndarray` of shape (n_iterations,)
         ||X-L-S||/||X||
 
     Notes
     -----
-    From GreGoDec.m
+    Translated to Python from GreGoDec.m and adapted somewhat.
 
     References
     ----------
@@ -204,56 +212,44 @@ def greedy_semisoft_godec(D, ranks, tau=1, tol=1e-7, inpower=2, k=2):
 
     Tianyi Zhou, 2013, All rights reserved.
     """
-    # set rankmax and sampling dictionary
-    rankmax = max(ranks)
-    outdict = {}
-    rks2sam = [int(np.round(rk)) for rk in (np.array(ranks) / k)]
-    rks2sam = sorted(rks2sam)
-
-    # matrix size
-    m, n = D.shape
-    # ok
-    if m < n:
+    data_transposed = False
+    if D.shape[0] < D.shape[1]:
+        LGR.info("Data were transposed prior to decomposition.")
+        data_transposed = True
         D = D.T
-        # ok
+
+    n_samples, n_features = D.shape
 
     # To match MATLAB's norm on a matrix, you need an order of 2.
-    normD = np.linalg.norm(D, ord=2)
+    norm_D = np.linalg.norm(D, ord=2)
 
     # initialization of L and S by discovering a low-rank sparse SVD and recombining
-    rankk = int(np.round(rankmax / k))
-    # ok
-    error = np.zeros(max(rankk * inpower, 1) + 1)
-    # ok
-    # LGR.info(error)
-    X, s, Y = svds(D, k, which="LM")
-    # CHECK svds
+    assert rank % rank_step_size == 0, "Rank must be divisible by step size."
+    n_rank_steps = rank // rank_step_size
+    rank_steps = np.arange(rank_step_size, rank + rank_step_size, rank_step_size)
+
+    error = np.zeros((n_rank_steps * iterated_power) + 1)
+
+    X, s, Y = svds(D, rank_step_size, which="LM")
     s = np.diag(s)
 
     X = X.dot(s)
-    # CHECK dot notation
-    L = X.dot(Y)
-    # CHECK dot notation
-    S = wthresh(D - L, tau)
-    # ok
-    T = D - L - S
-    # ok
-    error[0] = np.linalg.norm(T[:]) / normD
-    # CHECK np.linalg.norm types
-    iii = 1
+    low_rank = X.dot(Y)
+    sparse = wthresh(D - low_rank, tau)
+    T = D - low_rank - sparse
+
+    error[0] = np.linalg.norm(T, ord=2) / norm_D
+    iteration_counter = 0  # was named iii (very useful)
+    error_counter = 0
     stop = False
-    alf = 0
-    estrank = -1
 
     # Define some variables that shouldn't be touched before they're updated.
     X1 = Y1 = L1 = S1 = T1 = None
 
-    # tic;
-    # for r=1:rankk
-    for r in range(1, rankk + 1):  # CHECK iterator range
+    for i_rank_step, rank_step in enumerate(rank_steps):
         # parameters for alf
-        rrank = rankmax
-        estrank = 1
+        rrank = rank
+        est_rank = 1
         rank_min = 1
         rk_jump = 10
         alf = 0
@@ -261,127 +257,139 @@ def greedy_semisoft_godec(D, ranks, tau=1, tol=1e-7, inpower=2, k=2):
         itr_rank = 0
         minitr_reduce_rank = 5
         maxitr_reduce_rank = 50
-        if iii == inpower * (r - 2) + 1:
-            iii = iii + inpower
+        if iteration_counter == iterated_power * (i_rank_step - 2) + 1:
+            print(
+                f"Changing iteration counter from {iteration_counter} to "
+                f"{iteration_counter + iterated_power}"
+            )
+            iteration_counter = iteration_counter + iterated_power
 
-        for i_iter in range(inpower + 1):
-            LGR.debug(f"r {r}, i_iter {i_iter}, rrank {rrank}, alf {alf}")
+        for j_iter in range(iterated_power):
+            if not quiet:
+                print(f"rank_step: {rank_step}, iteration: {j_iter}, rrank: {rrank}, alf: {alf}")
 
             # Update of X
-            X = L.dot(Y.T)
-            # CHECK dot notation
-            # if estrank==1:
-            #    qro=qr(X,mode='economic');   #CHECK qr output formats    #stopping here on 1/12
-            # 	X = qro[0];
-            # 	R = qro[1];
-            # else:
+            X = low_rank.dot(Y.T)
+
+            # The original MATLAB code has 3 outputs for qr(X, 0) (including E) when est_rank==1.
+            # However, E is never used, so this doesn't seem to matter.
             X, R = qr(X, mode="economic")
             # CHECK qr output formats
 
             # Update of Y
-            Y = X.T.dot(L)
-            # CHECK dot notation
-            L = X.dot(Y)
-            # CHECK dot notation
+            Y = X.T.dot(low_rank)
+            low_rank = X.dot(Y)
 
             # Update of S
-            T = D - L
-            # ok
-            S = wthresh(T, tau)
-            # ok
+            T = D - low_rank
+            sparse = wthresh(T, tau)
 
             # Error, stopping criteria
-            T = T - S
+            T = T - sparse
+            # error_counter = iteration_counter + j_iter + 1  # was ii
+            error_counter += 1
             # ok
-            ii = iii + i_iter - 1
-            # ok
-            # embed()
-            error[ii] = np.linalg.norm(T[:]) / normD
-            if error[ii] < tol:
+
+            error[error_counter] = np.linalg.norm(T, ord=2) / norm_D
+            if error[error_counter] < tol:
                 stop = True
+                print("Error below tolerance. Stopping early.")
                 break
 
-            # adjust estrank
-            if estrank == 1:
-                dR = abs(np.diag(R))
-                drops = dR[:-1] / dR[1:]
-                # LGR.info(dR.shape)
-                dmx = max(drops)
-                imx = np.argmax(drops)
-                rel_drp = (rankmax - 1) * dmx / (sum(drops) - dmx)
+            # adjust est_rank
+            if est_rank == 1:
+                # This was the subfunction rank_estimator_adaptive
+                # if/else added because MATLAB will work with empty arrays without raising errors
+                if R.size > 1:
+                    dR = np.abs(np.diag(R))
+                    drops = dR[:-1] / dR[1:]
+                    dmx = max(drops)
+                    imx = np.argmax(drops)
+                    rel_drp = (rank - 1) * dmx / (sum(drops) - dmx)
+                else:
+                    rel_drp = 0
 
                 if (rel_drp > rk_jump and itr_rank > minitr_reduce_rank) or (
                     itr_rank > maxitr_reduce_rank
                 ):
-                    rrank = max([imx, np.floor(0.1 * rankmax), rank_min])
-                    estrank = 0
+                    rrank = np.maximum(imx, np.floor(0.1 * rank), rank_min)
+                    # res and normz are not defined/set in the MATLAB code
+                    # error[error_counter] = np.linalg.norm(res) / normz
+                    est_rank = 0
                     itr_rank = 0
 
-                    if rrank != rankmax:
-                        rankmax = rrank
-                        if estrank == 0:
-                            alf = 0
-                            continue
+            if rrank != rank:
+                rank = rrank
+                if est_rank == 0:
+                    alf = 0
+                    print("rrank != rank. Whatever that means.")
+                    continue
 
             # adjust alf
-            ratio = error[ii] / error[ii - 1]
+            ratio = error[error_counter] / error[error_counter - 1]
             if np.isinf(ratio):
+                LGR.warning("Infinite error ratio.")
                 ratio = 0
-            # LGR.info(ii, error, ratio)
 
             if ratio >= 1.1:
-                increment = max(0.1 * alf, 0.1 * increment)
+                increment = np.maximum(0.1 * alf, 0.1 * increment)
                 X = X1
                 Y = Y1
-                L = L1
-                S = S1
+                low_rank = L1
+                sparse = S1
                 T = T1
-                error[ii] = error[ii - 1]
+                error[error_counter] = error[error_counter - 1]
                 alf = 0
             elif ratio > 0.7:
-                increment = max(increment, 0.25 * alf)
+                increment = np.maximum(increment, 0.25 * alf)
                 alf = alf + increment
 
             # Update of L
-            # LGR.info("updating L")
-            X1 = X
-            Y1 = Y
-            L1 = L
-            S1 = S
-            T1 = T
-            # ipdb.set_trace()
-            L = L + ((1 + alf) * (T))
+            X1 = X.copy()
+            Y1 = Y.copy()
+            L1 = low_rank.copy()
+            S1 = sparse.copy()
+            T1 = T.copy()
+
+            low_rank = low_rank + ((1 + alf) * (T))
 
             # Add coreset
-            if i_iter > 8:
-                if np.mean(error[ii - 7 : ii + 1]) / error[ii - 8] > 0.92:
-                    iii = ii
-                    sf = X.shape[1]
-                    if Y.shape[0] - sf >= k:
-                        Y = Y[:sf, :]
-                    break
+            if (j_iter > 7) and (
+                np.mean(error[error_counter - 7 : error_counter]) / error[error_counter - 8] > 0.92
+            ):
+                iteration_counter = error_counter
+                sf = X.shape[1]
+                if Y.shape[0] - sf >= rank_step_size:
+                    Y = Y[:sf, :]
 
-        if r in rks2sam:
-            L = X.dot(Y)
-            if m < n:
-                temp_D = D.T
-                temp_L = L.T
-                temp_T = T.T
-            outdict[r * k] = [temp_L, temp_D - temp_L, temp_D - temp_L - temp_T]
+                print(
+                    "Detecting average decrease in error of <= 8% over past 7 iterations, "
+                    "indicating stabilization (I guess). Stopping early."
+                )
+                break
 
-        # Coreset
-        if not stop and r < rankk:
-            v = np.random.randn(k, np.maximum(m, n)).dot(L)
-            Y = np.vstack([Y, v])
-            # correct this
-
-        # Stop
         if stop:
+            print("Stopping early.")
             break
 
-    error[error == 0] = None
+        # Coreset
+        if i_rank_step < n_rank_steps - 1:
+            v = np.random.randn(rank_step_size, n_samples).dot(low_rank)
+            Y = np.vstack([Y, v])
 
-    return outdict
+    # Remove unused elements from error vector
+    error = np.trim_zeros(error, trim="b")
+
+    low_rank = X.dot(Y)
+    reconstruction = low_rank + sparse
+    noise = D - reconstruction
+    if data_transposed:
+        low_rank = low_rank.T
+        sparse = sparse.T
+        reconstruction = reconstruction.T
+        noise = noise.T
+
+    return low_rank, sparse, reconstruction, noise, error
 
 
 def run_godec_denoising(
@@ -392,9 +400,8 @@ def run_godec_denoising(
     method="greedy",
     ranks=[4],
     norm_mode="vn",
-    thresh=0.03,
     drank=2,
-    inpower=2,
+    iterated_power=2,
     wavelet=False,
 ):
     """Run GODEC denoising in neuroimaging data.
@@ -415,10 +422,6 @@ def run_godec_denoising(
     # Transpose to match ME-ICA convention (SxT instead of TxS)
     masked_data = masked_data.T
 
-    if thresh is None:
-        mu = masked_data.mean(axis=-1)
-        thresh = np.median(mu[mu != 0]) * 0.01
-
     if norm_mode == "dm":
         # Demean
         rmu = masked_data.mean(-1)
@@ -435,34 +438,37 @@ def run_godec_denoising(
     if wavelet:
         LGR.info("++Wavelet transforming data")
         temp_data, cal = dwtmat(dnorm)
-        thresh_ = temp_data.std() * thresh
-        LGR.info(f"Setting threshold to {thresh_}")
     else:
         temp_data = dnorm.copy()
-        thresh_ = thresh
 
-    if method == "greedy":
-        # GreGoDec
-        godec_outputs = greedy_semisoft_godec(
-            temp_data,
-            ranks=ranks,
-            tau=1,
-            tol=1e-7,
-            inpower=inpower,
-            k=drank,
-        )
-    else:
-        for rank in ranks:
-            X_L, X_S, X_LS, X_rmse = standard_godec(
+    for rank in ranks:
+        if method == "greedy":
+            # GreGoDec
+            lowrank, sparse, reconstruction, noise, error = greedy_semisoft_godec(
                 temp_data,
                 rank=rank,
-                card=None,
-                iterated_power=1,
-                tol=0.001,
-                max_iter=500,
+                tau=1,
+                tol=1e-7,
+                iterated_power=iterated_power,
+                rank_step_size=drank,
             )
+        else:
+            for rank in ranks:
+                lowrank, sparse, reconstruction, noise, error = standard_godec(
+                    temp_data,
+                    rank=rank,
+                    card=None,
+                    iterated_power=iterated_power,
+                    tol=0.001,
+                    max_iter=500,
+                )
 
-            godec_outputs[rank] = [X_L, X_S, X_LS]
+        godec_outputs[rank] = {
+            "lowrank": lowrank,
+            "sparse": sparse,
+            "reconstruction": reconstruction,
+            "noise": noise,
+        }
 
     if wavelet:
         LGR.info("++Inverse wavelet transforming outputs")
@@ -471,22 +477,30 @@ def run_godec_denoising(
 
     if norm_mode == "dm":
         for rank in godec_outputs.keys():
-            godec_outputs[rank][0] = godec_outputs[rank][0] + rmu[:, np.newaxis]
+            # Just add mean back into low-rank matrix
+            godec_outputs[rank]["lowrank"] = godec_outputs[rank]["lowrank"] + rmu[:, np.newaxis]
+            godec_outputs[rank]["reconstruction"] = (
+                godec_outputs[rank]["reconstruction"] + rmu[:, np.newaxis]
+            )
     elif norm_mode == "vn":
         for rank in godec_outputs.keys():
-            godec_outputs[rank][0] = (godec_outputs[rank][0] * rstd[:, np.newaxis]) + rmu[
-                :, np.newaxis
-            ]
-            godec_outputs[rank][1] = godec_outputs[rank][1] * rstd[:, np.newaxis]
-            godec_outputs[rank][2] = godec_outputs[rank][2] * rstd[:, np.newaxis]
+            # Low-rank and reconstructed matrices get variance and mean added back in
+            godec_outputs[rank]["lowrank"] = (
+                godec_outputs[rank]["lowrank"] * rstd[:, np.newaxis]
+            ) + rmu[:, np.newaxis]
+            godec_outputs[rank]["reconstruction"] = (
+                godec_outputs[rank]["reconstruction"] * rstd[:, np.newaxis]
+            ) + rmu[:, np.newaxis]
+            # Other matrices are just rescaled by variance
+            godec_outputs[rank]["sparse"] = godec_outputs[rank]["sparse"] * rstd[:, np.newaxis]
+            godec_outputs[rank]["noise"] = godec_outputs[rank]["noise"] * rstd[:, np.newaxis]
 
     metadata = {
         "normalization": norm_mode,
         "wavelet": wavelet,
         "ranks": ranks,
-        "k": drank,
-        "p": inpower,
-        "t": thresh,
+        "rank_step_size": drank,
+        "iterated_power": iterated_power,
     }
     metadata_file = os.path.join(out_dir, "dataset_description.json")
     with open(metadata_file, "w") as fo:
@@ -495,13 +509,17 @@ def run_godec_denoising(
     for rank, outputs in godec_outputs.items():
         lowrank_img = unmask(outputs[0].T, mask)
         sparse_img = unmask(outputs[1].T, mask)
-        noise_img = unmask(outputs[2].T, mask)
+        reconstruction_img = unmask(outputs[2].T, mask)
+        noise_img = unmask(outputs[3].T, mask)
 
         lowrank_img.to_filename(
             os.path.join(out_dir, f"{prefix}desc-GODEC_rank-{rank}_lowrankts.nii.gz")
         )
         sparse_img.to_filename(
             os.path.join(out_dir, f"{prefix}desc-GODEC_rank-{rank}_bold.nii.gz")
+        )
+        reconstruction_img.to_filename(
+            os.path.join(out_dir, f"{prefix}desc-GODECReconstructed_rank-{rank}_bold.nii.gz")
         )
         noise_img.to_filename(
             os.path.join(out_dir, f"{prefix}desc-GODEC_rank-{rank}_errorts.nii.gz")
