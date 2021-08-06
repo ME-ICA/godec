@@ -2,8 +2,8 @@
 
 import argparse
 
-from godec import godec
-from godec.utils import is_valid_file
+from .. import godec
+from ..utils import is_valid_file
 
 
 def _get_parser():
