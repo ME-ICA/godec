@@ -37,16 +37,17 @@ def standard_godec(
     m, n = X.shape
     if m < n:
         X = X.T
-    m, n = X.shape
+
     L = X
     S = np.zeros(L.shape)
     itr = 0
     random_state = np.random.RandomState(random_seed)
     while True:
-        Y2 = random_state.randn(n, rank)
+        Y2 = random_state.randn(np.minimum(m, n), rank)
         for i in range(power + 1):
             Y1 = np.dot(L, Y2)
             Y2 = np.dot(L.T, Y1)
+
         Q, R = qr(Y2, mode="full")
         L_new = np.dot(np.dot(L, Q), Q.T)
         T = L - L_new + S
@@ -56,6 +57,7 @@ def standard_godec(
         err = np.linalg.norm(T.ravel(), 2)
         if (err < tol) or (itr >= max_iter):
             break
+
         L += T
         itr += 1
 
@@ -75,14 +77,14 @@ def standard_godec(
     references.GODEC,
     description="Introduces the semi-soft GODEC algorithm.",
 )
-def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
+def greedy_semisoft_godec(D, ranks, tau=1, tol=1e-7, inpower=2, k=2):
     """Run the Greedy Semi-Soft GoDec Algorithm (GreBsmo).
 
     Parameters
     ----------
     D : array
         nxp data matrix with n samples and p features
-    rank : int
+    ranks : list of int
         rank(L)<=rank
     tau : float
         soft thresholding
@@ -270,13 +272,14 @@ def greedy_semisoft_godec(D, ranks, tau, tol, inpower, k):
         if r in rks2sam:
             L = X.dot(Y)
             if m < n:
-                L = L.T
-                S = S.T
-            outdict[r * k] = [L, D - L, D - L - T]
+                temp_D = D.T
+                temp_L = L.T
+                temp_T = T.T
+            outdict[r * k] = [temp_L, temp_D - temp_L, temp_D - temp_L - temp_T]
 
         # Coreset
         if not stop and r < rankk:
-            v = np.random.randn(k, m).dot(L)
+            v = np.random.randn(k, np.maximum(m, n)).dot(L)
             Y = np.vstack([Y, v])
             # correct this
 

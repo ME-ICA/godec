@@ -5,7 +5,7 @@ GIFT.
 
 from ._version import get_versions
 from .due import Doi, due
-from .godec import run_godec_denoising
+from .godec import greedy_semisoft_godec, run_godec_denoising, standard_godec
 
 __version__ = get_versions()["version"]
 
@@ -16,6 +16,8 @@ warnings.filterwarnings("ignore", r"cmp not installed")
 
 __all__ = [
     "run_godec_denoising",
+    "standard_godec",
+    "greedy_semisoft_godec",
     "__version__",
 ]
 
