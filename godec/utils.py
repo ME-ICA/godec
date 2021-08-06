@@ -36,4 +36,6 @@ def idwtmat(mmix_wt, cAl):
 def wthresh(a, thresh):
     """Determine soft wavelet threshold."""
     res = np.abs(a) - thresh
-    return np.sign(a) * ((res > 0) * res)
+    res = (res + np.abs(res)) / 2
+    y = np.sign(a) * res
+    return y

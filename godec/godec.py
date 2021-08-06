@@ -21,56 +21,97 @@ LGR = logging.getLogger(__name__)
 )
 def standard_godec(
     X,
-    thresh=0.03,
     rank=2,
-    power=1,
-    tol=1e-3,
+    card=None,
+    iterated_power=1,
+    tol=0.001,
     max_iter=100,
     random_seed=0,
+    thresh=0.03,
 ):
     """Run the standard GODEC method.
 
     Default threshold of .03 is assumed to be for input in the range 0-1...
     original matlab had 8 out of 255, which is about .03 scaled to 0-1 range
+
+    Parameters
+    ----------
+    X : numpy.ndarray
+        nxp data matrix with n samples and p features
+    rank : int
+        rank(L)<=rank
+    card : :obj:`int` or None, optional
+        The cardinality of the sparse matrix. Must be an integer >= 0, or None,
+        in which case it will be set to the number of elements in X.
+        Default is None.
+    iterated_power : int, optional
+        Number of iterations for the power method, increasing it lead to better accuracy and more
+        time cost. The default is 1.
+    tol : float
+        Error bound
+    thresh : float
+        soft thresholding
+
+    Notes
+    -----
+    From SSGoDec.m
     """
     LGR.info("++Starting Go Decomposition")
     m, n = X.shape
     if m < n:
         X = X.T
 
-    L = X
+    L = X.copy()
     S = np.zeros(L.shape)
     itr = 0
+    rmse = []
     random_state = np.random.RandomState(random_seed)
     while True:
+        # Update of L
         Y2 = random_state.randn(np.minimum(m, n), rank)
-        for i in range(power + 1):
+        for i in range(iterated_power + 1):
             Y1 = np.dot(L, Y2)
             Y2 = np.dot(L.T, Y1)
 
         Q, R = qr(Y2, mode="full")
         L_new = np.dot(np.dot(L, Q), Q.T)
+
+        # Update of S
         T = L - L_new + S
         L = L_new
+
+        # The version from the original GODEC code
+        # Requires "card" (cardinality of S)
+        # card = 310000
+        # T = np.ravel(T)
+        # S = np.zeros(T.shape)
+        # idx = np.argsort(np.abs(T))[::-1]
+        # S[idx[:card]] = T[idx[:card]]
+        # S = np.reshape(S, X.shape)
+        # T[idx[:card]] = 0
+        # T = np.reshape(T, X.shape)
+
+        # Alternate approach taken from the Greedy Semi-Soft GoDec Algorithm code
+        # This automatically determines cardinality of S from tau threshold.
         S = wthresh(T, thresh)
-        T -= S
-        err = np.linalg.norm(T.ravel(), 2)
-        if (err < tol) or (itr >= max_iter):
+        T = T - S
+
+        # Error, stopping criteria
+        rmse.append(np.linalg.norm(T))
+        if (rmse[-1] < tol) or (itr >= max_iter):
             break
 
         L += T
         itr += 1
 
-    # Is this even useful in soft GoDec? May be a display issue...
-    G = X - L - S
+    error = np.linalg.norm((L + S) - X) / np.linalg.norm(X)
     if m < n:
         L = L.T
         S = S.T
-        G = G.T
 
     LGR.debug(f"Finished at iteration {itr}")
 
-    return L, S, G
+    return L, S, error, rmse
 
 
 @due.dcite(
@@ -103,6 +144,10 @@ def greedy_semisoft_godec(D, ranks, tau=1, tol=1e-7, inpower=2, k=2):
         error
     error
         ||X-L-S||/||X||
+
+    Notes
+    -----
+    From GreGoDec.m
 
     References
     ----------
