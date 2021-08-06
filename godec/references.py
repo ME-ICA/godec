@@ -20,3 +20,15 @@ GODEC = BibTeX(
     }
     """
 )
+
+BILATERAL_SKETCH = BibTeX(
+    """
+    @article{zhou2013greedy,
+        title={Greedy bilateral sketch, completion and smoothing for large-scale matrix completion,
+               robust PCA and low-rank approximation},
+        author={Zhou, T and Tao, D},
+        journal={AISTATS 2013},
+        year={2013}
+    }
+    """
+)

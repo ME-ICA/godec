@@ -7,6 +7,7 @@ import numpy as np
 from nilearn.masking import apply_mask, unmask
 from scipy.linalg import qr
 from scipy.sparse.linalg import svds
+from sklearn import metrics
 
 from . import references
 from .due import due
@@ -24,10 +25,8 @@ def standard_godec(
     rank=2,
     card=None,
     iterated_power=1,
-    tol=0.001,
     max_iter=100,
-    random_seed=0,
-    thresh=0.03,
+    tol=0.001,
 ):
     """Run the standard GODEC method.
 
@@ -36,87 +35,135 @@ def standard_godec(
 
     Parameters
     ----------
-    X : numpy.ndarray
-        nxp data matrix with n samples and p features
-    rank : int
-        rank(L)<=rank
+    X : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        Data matrix. If ``n_samples`` < ``n_features``, the matrix will automatically be
+        transposed prior to decomposition.
+        Outputs will then be transposed to ensure compatible dimensions.
+    rank : :obj:`int`, optional
+        The rank of low-rank matrix. Must be an integer >= 1.
+        The default is 2.
     card : :obj:`int` or None, optional
         The cardinality of the sparse matrix. Must be an integer >= 0, or None,
         in which case it will be set to the number of elements in X.
         Default is None.
-    iterated_power : int, optional
+    iterated_power : :obj:`int`, optional
         Number of iterations for the power method, increasing it lead to better accuracy and more
-        time cost. The default is 1.
-    tol : float
-        Error bound
-    thresh : float
-        soft thresholding
+        time cost. Must be an integer >= 1. The default is 1.
+    max_iter : :obj:`int`, optional
+        Maximum number of iterations to be run. Must be an integer >= 1. The default is 100.
+    tol : :obj:`float`, optional
+        Tolerance for stopping criteria. Must be a float > 0. The default is 0.001.
+
+    Returns
+    -------
+    low_rank : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The low-rank matrix. Known as L in the original code and formulae.
+    sparse : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The sparse matrix. Known as S in the original code and formulae.
+    reconstruction : :obj:`numpy.ndarray` of shape (n_samples, n_features)
+        The reconstruction matrix. Known as LS in the original code and formulae.
+    rmse : :obj:`list`
+        Root mean-squared error values. One value for each iteration.
 
     Notes
     -----
-    From SSGoDec.m
+    From https://github.com/andrewssobral/godec.
+
+    Minimal variable name changes have been made by Taylor Salo for readability and PEP8
+    compatibility.
+
+    License
+    -------
+    MIT License
+
+    Copyright (c) 2020 Andrews Sobral
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
     """
-    LGR.info("++Starting Go Decomposition")
-    m, n = X.shape
-    if m < n:
+    i_iter = 1
+    rmse = []
+    card = np.prod(X.shape) if card is None else card
+
+    data_transposed = False
+    if X.shape[0] < X.shape[1]:
+        LGR.info("Data were transposed prior to decomposition.")
+        data_transposed = True
         X = X.T
 
-    L = X.copy()
-    S = np.zeros(L.shape)
-    itr = 0
-    rmse = []
-    random_state = np.random.RandomState(random_seed)
+    _, n_features = X.shape
+
+    LGR.info("++Starting Go Decomposition")
+
+    # Initialization of L and S
+    low_rank = X
+    sparse = np.zeros(X.shape)
+    reconstruction = np.zeros(X.shape)
+
     while True:
         # Update of L
-        Y2 = random_state.randn(np.minimum(m, n), rank)
-        for i in range(iterated_power + 1):
-            Y1 = np.dot(L, Y2)
-            Y2 = np.dot(L.T, Y1)
+        Y2 = np.random.randn(n_features, rank)
+        for j_power in range(iterated_power):
+            Y1 = low_rank.dot(Y2)
+            Y2 = low_rank.T.dot(Y1)
 
-        Q, R = qr(Y2, mode="full")
-        L_new = np.dot(np.dot(L, Q), Q.T)
+        Q, R = qr(Y2, mode="economic")
+        low_rank_new = (low_rank.dot(Q)).dot(Q.T)
 
         # Update of S
-        T = L - L_new + S
-        L = L_new
+        T = low_rank - low_rank_new + sparse
+        low_rank = low_rank_new
+        T_1d = T.reshape(-1)
+        sparse_1d = sparse.reshape(-1)
+        idx = np.abs(T_1d).argsort()[::-1]
+        sparse_1d[idx[:card]] = T_1d[idx[:card]]
+        sparse = sparse_1d.reshape(sparse.shape)
 
-        # The version from the original GODEC code
-        # Requires "card" (cardinality of S)
-        # card = 310000
-        # T = np.ravel(T)
-        # S = np.zeros(T.shape)
-        # idx = np.argsort(np.abs(T))[::-1]
-        # S[idx[:card]] = T[idx[:card]]
-        # S = np.reshape(S, X.shape)
-        # T[idx[:card]] = 0
-        # T = np.reshape(T, X.shape)
+        # Reconstruction
+        reconstruction = low_rank + sparse
 
-        # Alternate approach taken from the Greedy Semi-Soft GoDec Algorithm code
-        # This automatically determines cardinality of S from tau threshold.
-        S = wthresh(T, thresh)
-        T = T - S
+        # Stopping criteria
+        error = np.sqrt(metrics.mean_squared_error(X, reconstruction))
+        rmse.append(error)
 
-        # Error, stopping criteria
-        rmse.append(np.linalg.norm(T))
-        if (rmse[-1] < tol) or (itr >= max_iter):
+        LGR.info(f"iter: {i_iter}\terror: {error}")
+        if (error <= tol) or (i_iter >= max_iter):
             break
+        else:
+            i_iter = i_iter + 1
 
-        L += T
-        itr += 1
+    LGR.debug(f"Finished at iteration {i_iter}")
 
-    error = np.linalg.norm((L + S) - X) / np.linalg.norm(X)
-    if m < n:
-        L = L.T
-        S = S.T
+    if data_transposed:
+        low_rank = low_rank.T
+        sparse = sparse.T
+        reconstruction = reconstruction.T
 
-    LGR.debug(f"Finished at iteration {itr}")
-
-    return L, S, error, rmse
+    return low_rank, sparse, reconstruction, rmse
 
 
 @due.dcite(
     references.GODEC,
     description="Introduces the semi-soft GODEC algorithm.",
+)
+@due.dcite(
+    references.BILATERAL_SKETCH,
+    description="Introduces the greedy bilateral smoothing method.",
 )
 def greedy_semisoft_godec(D, ranks, tau=1, tol=1e-7, inpower=2, k=2):
     """Run the Greedy Semi-Soft GoDec Algorithm (GreBsmo).
@@ -406,17 +453,16 @@ def run_godec_denoising(
         )
     else:
         for rank in ranks:
-            X_L, X_S, X_G = standard_godec(
+            X_L, X_S, X_LS, X_rmse = standard_godec(
                 temp_data,
-                thresh=thresh_,
                 rank=rank,
-                power=1,
-                tol=1e-3,
+                card=None,
+                iterated_power=1,
+                tol=0.001,
                 max_iter=500,
-                random_seed=0,
             )
 
-            godec_outputs[rank] = [X_L, X_S, X_G]
+            godec_outputs[rank] = [X_L, X_S, X_LS]
 
     if wavelet:
         LGR.info("++Inverse wavelet transforming outputs")
