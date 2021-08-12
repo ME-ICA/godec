@@ -9,7 +9,8 @@ from scipy.linalg import qr
 from scipy.sparse.linalg import svds
 from sklearn import metrics
 
-from . import __version__, references
+from . import references
+from ._version import get_versions
 from .due import due
 from .utils import dwtmat, idwtmat, wthresh
 
@@ -518,7 +519,7 @@ def run_godec_denoising(
                     "iterated_power": iterated_power,
                 },
                 "CodeURL": "https://github.com/ME-ICA/godec",
-                "Version": __version__,
+                "Version": get_versions()["version"],
             }
         ],
     }
