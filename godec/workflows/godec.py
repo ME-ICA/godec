@@ -2,7 +2,7 @@
 
 import argparse
 
-from .. import godec
+from .. import decomposition
 from ..utils import is_valid_file
 
 
@@ -99,4 +99,4 @@ def _get_parser():
 
 def _main(argv=None):
     options = _get_parser().parse_args(argv)
-    godec.run_godec_denoising(**vars(options))
+    decomposition.godec_fmri(**vars(options))

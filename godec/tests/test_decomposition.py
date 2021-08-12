@@ -1,13 +1,13 @@
-"""Tests for the godec.godec module."""
+"""Tests for the godec.decomposition module."""
 import os
 
-from godec import godec
+from godec import decomposition
 
 
-def test_run_godec_denoising_smoke(testdata, tmp_path_factory):
-    """Smoke test godec.run_godec_denoising."""
-    tmpdir = tmp_path_factory.mktemp("test_run_godec_denoising_smoke")
-    godec.run_godec_denoising(
+def test_godec_fmri_smoke(testdata, tmp_path_factory):
+    """Smoke test decomposition.godec_fmri."""
+    tmpdir = tmp_path_factory.mktemp("test_godec_fmri_smoke")
+    decomposition.godec_fmri(
         testdata["func"],
         testdata["mask"],
         out_dir=tmpdir,
@@ -34,10 +34,10 @@ def test_run_godec_denoising_smoke(testdata, tmp_path_factory):
         assert os.path.isfile(os.path.join(tmpdir, out_file))
 
 
-def test_run_godec_denoising_smoke_wavelet(testdata, tmp_path_factory):
-    """Smoke test godec.run_godec_denoising with wavelet transformation."""
-    tmpdir = tmp_path_factory.mktemp("test_run_godec_denoising_smoke_wavelet")
-    godec.run_godec_denoising(
+def test_godec_fmri_smoke_wavelet(testdata, tmp_path_factory):
+    """Smoke test decomposition.godec_fmri with wavelet transformation."""
+    tmpdir = tmp_path_factory.mktemp("test_godec_fmri_smoke_wavelet")
+    decomposition.godec_fmri(
         testdata["func"],
         testdata["mask"],
         out_dir=tmpdir,
@@ -60,9 +60,9 @@ def test_run_godec_denoising_smoke_wavelet(testdata, tmp_path_factory):
         assert os.path.isfile(os.path.join(tmpdir, out_file))
 
 
-def test_greedy_semisoft_godec_smoke(testdata):
-    """Smoke test godec.greedy_semisoft_godec."""
-    out = godec.greedy_semisoft_godec(
+def test_godec_greedy_semisoft_smoke(testdata):
+    """Smoke test decomposition.godec_greedy_semisoft."""
+    out = decomposition.godec_greedy_semisoft(
         testdata["data_array"],
         rank=2,
         tau=1,
@@ -74,9 +74,9 @@ def test_greedy_semisoft_godec_smoke(testdata):
     assert all(val.shape == testdata["data_array"].shape for val in out[:-1])
 
 
-def test_standard_godec_smoke(testdata):
-    """Smoke test godec.standard_godec."""
-    out = godec.standard_godec(
+def test_godec_standard_smoke(testdata):
+    """Smoke test decomposition.godec_standard."""
+    out = decomposition.godec_standard(
         testdata["data_array"],
         rank=2,
         card=None,

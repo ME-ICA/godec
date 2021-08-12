@@ -21,7 +21,7 @@ LGR = logging.getLogger(__name__)
     references.GODEC,
     description="Introduces the standard GODEC algorithm.",
 )
-def standard_godec(
+def godec_standard(
     X,
     rank=2,
     card=None,
@@ -172,7 +172,7 @@ def standard_godec(
     references.BILATERAL_SKETCH,
     description="Introduces the greedy bilateral smoothing method.",
 )
-def greedy_semisoft_godec(
+def godec_greedy_semisoft(
     D,
     rank,
     tau=1,
@@ -401,7 +401,7 @@ def greedy_semisoft_godec(
     return low_rank, sparse, reconstruction, noise, error
 
 
-def run_godec_denoising(
+def godec_fmri(
     in_file,
     mask,
     out_dir=".",
@@ -413,7 +413,7 @@ def run_godec_denoising(
     iterated_power=2,
     wavelet=False,
 ):
-    """Run GODEC denoising in neuroimaging data.
+    """Run GODEC denoising on neuroimaging data.
 
     Notes
     -----
@@ -453,7 +453,7 @@ def run_godec_denoising(
     for rank in ranks:
         if method == "greedy":
             # GreGoDec
-            lowrank, sparse, reconstruction, noise, error = greedy_semisoft_godec(
+            lowrank, sparse, reconstruction, noise, error = godec_greedy_semisoft(
                 temp_data,
                 rank=rank,
                 tau=1,
@@ -462,7 +462,7 @@ def run_godec_denoising(
                 rank_step_size=rank_step_size,
             )
         else:
-            lowrank, sparse, reconstruction, noise, error = standard_godec(
+            lowrank, sparse, reconstruction, noise, error = godec_standard(
                 temp_data,
                 rank=rank,
                 card=None,

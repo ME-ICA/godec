@@ -1,11 +1,8 @@
-"""
-mapca: A Python implementation of the moving average principal components analysis methods from
-GIFT.
-"""
+"""GODEC: A Python implementation of the Go Decomposition algorithm for fMRI data."""
 
 from ._version import get_versions
+from .decomposition import godec_fmri, godec_greedy_semisoft, godec_standard
 from .due import Doi, due
-from .godec import greedy_semisoft_godec, run_godec_denoising, standard_godec
 
 __version__ = get_versions()["version"]
 
@@ -15,9 +12,9 @@ import warnings
 warnings.filterwarnings("ignore", r"cmp not installed")
 
 __all__ = [
-    "run_godec_denoising",
-    "standard_godec",
-    "greedy_semisoft_godec",
+    "godec_fmri",
+    "godec_greedy_semisoft",
+    "godec_standard",
     "__version__",
 ]
 
