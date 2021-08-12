@@ -9,7 +9,7 @@ from scipy.linalg import qr
 from scipy.sparse.linalg import svds
 from sklearn import metrics
 
-from . import references
+from . import __version__, references
 from .due import due
 from .utils import dwtmat, idwtmat, wthresh
 
@@ -504,11 +504,23 @@ def run_godec_denoising(
             godec_outputs[rank]["noise"] = godec_outputs[rank]["noise"] * rstd[:, np.newaxis]
 
     metadata = {
-        "normalization": norm_mode,
-        "wavelet": wavelet,
-        "ranks": ranks,
-        "rank_step_size": rank_step_size,
-        "iterated_power": iterated_power,
+        "Name": "Go Decomposition",
+        "DatasetType": "derivative",
+        "GeneratedBy": [
+            {
+                "Name": "GODEC",
+                "Description": "Go decomposition applied to fMRI data.",
+                "GODECSettings": {
+                    "normalization": norm_mode,
+                    "wavelet": wavelet,
+                    "ranks": ranks,
+                    "rank_step_size": rank_step_size,
+                    "iterated_power": iterated_power,
+                },
+                "CodeURL": "https://github.com/ME-ICA/godec",
+                "Version": __version__,
+            }
+        ],
     }
     metadata_file = os.path.join(out_dir, "dataset_description.json")
     with open(metadata_file, "w") as fo:
