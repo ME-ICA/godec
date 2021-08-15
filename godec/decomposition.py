@@ -28,7 +28,6 @@ def godec_standard(
     iterated_power=1,
     max_iter=100,
     tol=0.001,
-    quiet=False,
 ):
     """Run the standard GODEC method.
 
@@ -144,8 +143,7 @@ def godec_standard(
         error = np.sqrt(metrics.mean_squared_error(X, reconstruction))
         rmse.append(error)
 
-        if not quiet:
-            print(f"Iteration: {i_iter}, RMSE: {error}")
+        LGR.debug(f"Iteration: {i_iter}, RMSE: {error}")
 
         if error <= tol:
             break
@@ -179,7 +177,6 @@ def godec_greedy_semisoft(
     tol=1e-7,
     iterated_power=2,
     rank_step_size=2,
-    quiet=False,
 ):
     """Run the Greedy Semi-Soft GoDec Algorithm (GreBsmo).
 
@@ -187,10 +184,12 @@ def godec_greedy_semisoft(
     ----------
     D : array
         nxp data matrix with n samples and p features
-    ranks : list of int
+    rank : int
         rank(L)<=rank
     tau : float
         soft thresholding
+    tol : float
+        Tolerance
     iterated_power : float
         >=0, power scheme modification, increasing it lead to better accuracy and more time cost
     rank_step_size : int
@@ -267,15 +266,16 @@ def godec_greedy_semisoft(
         minitr_reduce_rank = 5
         maxitr_reduce_rank = 50
         if iteration_counter == iterated_power * (i_rank_step - 2) + 1:
-            print(
+            LGR.info(
                 f"Changing iteration counter from {iteration_counter} to "
                 f"{iteration_counter + iterated_power}"
             )
             iteration_counter = iteration_counter + iterated_power
 
         for j_iter in range(iterated_power):
-            if not quiet:
-                print(f"rank_step: {rank_step}, iteration: {j_iter}, rrank: {rrank}, alf: {alf}")
+            LGR.debug(
+                f"rank_step: {rank_step}, iteration: {j_iter}, rrank: {rrank}, alf: {alf}"
+            )
 
             # Update of X
             X = low_rank.dot(Y.T)
@@ -302,7 +302,7 @@ def godec_greedy_semisoft(
             error[error_counter] = np.linalg.norm(T, ord=2) / norm_D
             if error[error_counter] < tol:
                 stop = True
-                print("Error below tolerance. Stopping early.")
+                LGR.info("Error below tolerance. Stopping early.")
                 break
 
             # adjust est_rank
@@ -331,7 +331,7 @@ def godec_greedy_semisoft(
                 rank = rrank
                 if est_rank == 0:
                     alf = 0
-                    print("rrank != rank. Whatever that means.")
+                    LGR.warning("rrank != rank. Whatever that means.")
                     continue
 
             # adjust alf
@@ -371,14 +371,14 @@ def godec_greedy_semisoft(
                 if Y.shape[0] - sf >= rank_step_size:
                     Y = Y[:sf, :]
 
-                print(
+                LGR.debug(
                     "Detecting average decrease in error of <= 8% over past 7 iterations, "
                     "indicating stabilization (I guess). Stopping early."
                 )
                 break
 
         if stop:
-            print("Stopping early.")
+            LGR.info("Stopping early.")
             break
 
         # Coreset
@@ -415,13 +415,36 @@ def godec_fmri(
 ):
     """Run GODEC denoising on neuroimaging data.
 
+    Parameters
+    ----------
+    in_file : str or niimg
+        4D fMRI file or niimg to decompose.
+    mask : str or niimg
+        Boolean mask.
+    out_dir : str, optional
+        Output directory in which to write files. Default is current directory.
+    prefix : str, optional
+        Prefix to prepend to output files.
+        If not None, and doesn't end with "_", then "_" will be appended to the prefix.
+        Default is None.
+    method : {"greedy", "standard"}, optional
+        Default is "greedy".
+    ranks : list of int, optional
+        Default is [4].
+    norm_mode : {"vn", "dm", "none"}, optional
+        Normalization method to apply to data. Options are "vn" (variance normalization),
+        "dm" (mean centering), or "none". Default is "vn".
+    rank_step_size : int, optional
+        Default is 2.
+    iterated_power : int, optional
+        Default is 2.
+    wavelet : bool, optional
+        Whether to perform wavelet transform before and after decomposition or not.
+        Default is False.
+
     Notes
     -----
-    - Prantik mentioned that GODEC is run on outputs (e.g., High-Kappa), not inputs.
-      https://github.com/ME-ICA/me-ica/issues/4#issuecomment-369058732
-    - The paper tested ranks of 1-4. See page 5 of online supplemental methods.
-    - The paper used a discrete Daubechies wavelet transform before and after GODEC,
-      with rank-1 approximation and 100 iterations. See page 4 of online supplemental methods.
+    This function writes out several files to the output directory in pseudo-BIDS format.
     """
     if not prefix.endswith("_"):
         prefix = prefix + "_"
@@ -445,7 +468,7 @@ def godec_fmri(
     # GoDec
     godec_outputs = {}
     if wavelet:
-        LGR.info("++Wavelet transforming data")
+        LGR.info("Wavelet transforming data")
         temp_data, cal = dwtmat(dnorm)
     else:
         temp_data = dnorm.copy()
@@ -479,7 +502,7 @@ def godec_fmri(
         }
 
     if wavelet:
-        LGR.info("++Inverse wavelet transforming outputs")
+        LGR.info("Inverse wavelet transforming outputs")
         for rank, arrs in godec_outputs.items():
             for name, arr in arrs.items():
                 godec_outputs[rank][name] = idwtmat(arr, cal)
@@ -523,8 +546,7 @@ def godec_fmri(
             }
         ],
     }
-    metadata_file = os.path.join(out_dir, "dataset_description.json")
-    with open(metadata_file, "w") as fo:
+    with open(os.path.join(out_dir, "dataset_description.json"), "w") as fo:
         json.dump(metadata, fo, sort_keys=True, indent=4)
 
     for rank, outputs in godec_outputs.items():
