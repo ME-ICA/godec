@@ -273,9 +273,7 @@ def godec_greedy_semisoft(
             iteration_counter = iteration_counter + iterated_power
 
         for j_iter in range(iterated_power):
-            LGR.debug(
-                f"rank_step: {rank_step}, iteration: {j_iter}, rrank: {rrank}, alf: {alf}"
-            )
+            LGR.debug(f"rank_step: {rank_step}, iteration: {j_iter}, rrank: {rrank}, alf: {alf}")
 
             # Update of X
             X = low_rank.dot(Y.T)
