@@ -1,6 +1,8 @@
 """Tests for the godec.decomposition module."""
 import os
 
+import nibabel as nib
+
 from godec import decomposition
 
 
@@ -33,6 +35,14 @@ def test_godec_fmri_smoke(testdata, tmp_path_factory):
     for out_file in out_files:
         assert os.path.isfile(os.path.join(tmpdir, out_file))
 
+    orig_img = nib.load(testdata["func"])
+    for out_file in out_files:
+        if out_file.endswith(".nii.gz"):
+            test_img = nib.load(os.path.join(tmpdir, out_file))
+            assert test_img.shape == orig_img.shape, (
+                f"{out_file}: {orig_img.shape} != {test_img.shape}"
+            )
+
 
 def test_godec_fmri_smoke_wavelet(testdata, tmp_path_factory):
     """Smoke test decomposition.godec_fmri with wavelet transformation."""
@@ -58,6 +68,14 @@ def test_godec_fmri_smoke_wavelet(testdata, tmp_path_factory):
     ]
     for out_file in out_files:
         assert os.path.isfile(os.path.join(tmpdir, out_file))
+
+    orig_img = nib.load(testdata["func"])
+    for out_file in out_files:
+        if out_file.endswith(".nii.gz"):
+            test_img = nib.load(os.path.join(tmpdir, out_file))
+            assert test_img.shape == orig_img.shape, (
+                f"{out_file}: {orig_img.shape} != {test_img.shape}"
+            )
 
 
 def test_godec_greedy_semisoft_smoke(testdata):
