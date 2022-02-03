@@ -39,9 +39,9 @@ def test_godec_fmri_smoke(testdata, tmp_path_factory):
     for out_file in out_files:
         if out_file.endswith(".nii.gz"):
             test_img = nib.load(os.path.join(tmpdir, out_file))
-            assert test_img.shape == orig_img.shape, (
-                f"{out_file}: {orig_img.shape} != {test_img.shape}"
-            )
+            assert (
+                test_img.shape == orig_img.shape
+            ), f"{out_file}: {orig_img.shape} != {test_img.shape}"
 
 
 def test_godec_fmri_smoke_wavelet(testdata, tmp_path_factory):
@@ -73,9 +73,9 @@ def test_godec_fmri_smoke_wavelet(testdata, tmp_path_factory):
     for out_file in out_files:
         if out_file.endswith(".nii.gz"):
             test_img = nib.load(os.path.join(tmpdir, out_file))
-            assert test_img.shape == orig_img.shape, (
-                f"{out_file}: {orig_img.shape} != {test_img.shape}"
-            )
+            assert (
+                test_img.shape == orig_img.shape
+            ), f"{out_file}: {orig_img.shape} != {test_img.shape}"
 
 
 def test_godec_greedy_semisoft_smoke(testdata):
