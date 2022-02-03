@@ -468,6 +468,7 @@ def godec_fmri(
     if wavelet:
         LGR.info("Wavelet transforming data")
         temp_data, cal = dwtmat(dnorm)
+        n_volumes = dnorm.shape[1]
     else:
         temp_data = dnorm.copy()
 
@@ -503,7 +504,11 @@ def godec_fmri(
         LGR.info("Inverse wavelet transforming outputs")
         for rank, arrs in godec_outputs.items():
             for name, arr in arrs.items():
-                godec_outputs[rank][name] = idwtmat(arr, cal)
+                xformed_arr = idwtmat(arr, cal)
+                # Crop out any spurious extra volumes
+                # See https://github.com/ME-ICA/godec/issues/4 for more information
+                xformed_arr = xformed_arr[:, :n_volumes]
+                godec_outputs[rank][name] = xformed_arr
 
     if norm_mode == "dm":
         for rank in godec_outputs.keys():
